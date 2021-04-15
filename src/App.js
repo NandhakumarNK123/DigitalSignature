@@ -1,54 +1,43 @@
-import React, { useEffect } from 'react';
-import { Router } from '@reach/router';
-import { useSelector, useDispatch } from 'react-redux';
-
-import AssignUsers from './components/AssignUsers';
-import SignIn from './components/SignIn/SignIn';
-import SignUp from './components/SignUp/SignUp';
-import Preparation from './components/Preparation';
-import Sign from './components/Sign';
-import View from './components/View';
-import Header from './components/Header';
-import PasswordReset from './components/PasswordReset/PasswordReset';
-import Welcome from './components/Welcome';
-
-import { auth, generateUserDocument } from './firebase/firebase';
-import { setUser, selectUser } from './firebase/firebaseSlice';
-
+import React, { useRef, useEffect } from 'react';
+import WebViewer from '@pdftron/webviewer';
 import './App.css';
 
 const App = () => {
-  const user = useSelector(selectUser);
-  const dispatch = useDispatch();
+  const viewer = useRef(null);
 
+  // if using a class, equivalent of componentDidMount 
   useEffect(() => {
-    auth.onAuthStateChanged(async userAuth => {
-      if (userAuth) {
-        const user = await generateUserDocument(userAuth);
-        const { uid, displayName, email, photoURL } = user;
-        dispatch(setUser({ uid, displayName, email, photoURL }));
-      }
-    });
-  }, [dispatch]);
+    WebViewer(
+      {
+        path: '/webviewer/lib',
+        initialDoc: '/files/PDFTRON_about.pdf',
+      },
+      viewer.current,
+    ).then((instance) => {
+      const { docViewer, Annotations } = instance;
+      const annotManager = docViewer.getAnnotationManager();
 
-  return user ? (
-    <div>
-      <Router>
-        <Welcome path="/" />
-        <AssignUsers path="/assignUsers" />
-        <Preparation path="/prepareDocument" />
-        <Sign path="/signDocument" />
-        <View path="/viewDocument" />
-      </Router>
-    </div>
-  ) : (
-    <div>
-      <Header />
-      <Router>
-        <SignIn path="/" />
-        <SignUp path="signUp" />
-        <PasswordReset path="passwordReset" />
-      </Router>
+      docViewer.on('documentLoaded', () => {
+        const rectangleAnnot = new Annotations.RectangleAnnotation();
+        rectangleAnnot.PageNumber = 1;
+        // values are in page coordinates with (0, 0) in the top left
+        rectangleAnnot.X = 100;
+        rectangleAnnot.Y = 150;
+        rectangleAnnot.Width = 200;
+        rectangleAnnot.Height = 50;
+        rectangleAnnot.Author = annotManager.getCurrentUser();
+
+        annotManager.addAnnotation(rectangleAnnot);
+        // need to draw the annotation otherwise it won't show up until the page is refreshed
+        annotManager.redrawAnnotation(rectangleAnnot);
+      });
+    });
+  }, []);
+
+  return (
+    <div className="App">
+      <div className="header">React sample</div>
+      <div className="webviewer" ref={viewer}></div>
     </div>
   );
 };
